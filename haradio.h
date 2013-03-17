@@ -24,6 +24,7 @@ private:
     void spiTable(const prog_uchar *table);
     byte regRead(byte reg);
     byte statusRead();
+    void DEBUGREG();
 };
 
 #endif

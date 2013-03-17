@@ -27,6 +27,13 @@ void HARadio::spiTable(const prog_uchar *table)
     }
 }
 
+void HARadio::DEBUGREG() {
+  regRead(0x35);  // MARCSTATE
+  regRead(0x38);  // PKTSTATUS
+  regRead(0x33);  // LQI
+  regRead(0x34);  // RSSI
+}
+
 byte HARadio::regRead(byte reg)
 {
     digitalWrite(csn, LOW);
@@ -72,7 +79,7 @@ void HARadio::reset()
         2, 0x0F, 0xB1,      // FREQ0
         2, 0x10, 0x2D,      // MDMCFG4     CHANBW = 541.666 kHz
         2, 0x11, 0x3B,      // MDMCFG3     DRATE = 249.94 kBaud
-        2, 0x12, 0x07,      // MDMCFG2     2-FSK modulation, 30/32 sync word bits
+        2, 0x12, 0x73,      // MDMCFG2     MSK modulation, 30/32 sync word bits
         2, 0x13, 0x22,      // MDMCFG1     FEC disabled, 2 preamble bytes
         2, 0x14, 0xF8,      // MDMCFG0     CHANSPC = 199.951 kHz
         2, 0x0A, 0x01,      // CHANNR      Channel number 1
@@ -96,7 +103,7 @@ void HARadio::reset()
         2, 0x00, 0x29,      // IOCFG2      GDO2 used as CHIP_RDYn (default)
         2, 0x02, 0x06,      // IOCFG0      GDO0 used as sync
         2, 0x07, 0x00,      // PKTCTRL1    Addr check, broadcast, CRC autoflush
-        2, 0x08, 0x02,      // PKTCTRL0    No whitening, normal TX/RX mode, CRC on
+        2, 0x08, 0x01,      // PKTCTRL0    No whitening, normal TX/RX mode, CRC on
         2, 0x09, 0x01,      // ADDR        Device address 0x01
         2, 0x06, 0x09,      // PKTLEN      Using 9-byte packet
         9, 0x7E,            // PATABLE     Set maximum output power
@@ -107,7 +114,11 @@ void HARadio::reset()
         1, 0x34,            // SRX         Wait for packets
         0,
     };
+    
+
     spiTable(init);
+    
+    DEBUGREG();
 }
 
 void HARadio::txBuffer(const uint8_t *buffer, uint8_t len) {
@@ -123,12 +134,13 @@ void HARadio::txBuffer(const uint8_t *buffer, uint8_t len) {
     digitalWrite(csn, LOW);
     SPI.transfer(0x7F);
     SPI.transfer(len+1); // plus 1 for the address field
-    SPI.transfer(0); // for the address.  All HA devices are address 0
+    SPI.transfer(1); // for the address.  All HA devices are address 0
     while (len--)
         SPI.transfer(*(buffer++));
     digitalWrite(csn, HIGH);
 
     delayMicroseconds(5);
+    DEBUGREG();
     // Trigger the transmit
     const static prog_uchar trigger[] PROGMEM = {
         1, 0x35,            // STX        Enter transmit state
@@ -138,6 +150,8 @@ void HARadio::txBuffer(const uint8_t *buffer, uint8_t len) {
     
     delayMicroseconds(10);
     
+    DEBUGREG();
+    
     // wait until transmit is done, this is blocking!
     while (1) {
       if ((regRead(0xFA) & 0x7F) == 0)
@@ -145,26 +159,36 @@ void HARadio::txBuffer(const uint8_t *buffer, uint8_t len) {
       delayMicroseconds(10);
     }
     
+    DEBUGREG();
+    
+    delayMicroseconds(100); // just to be sure?
+    
     const static prog_uchar backtoread[] PROGMEM = {
       1, 0x36,
-      1, 0x34,
       0,
     };
     spiTable(backtoread);
     delayMicroseconds(1);
+    
+    DEBUGREG();
 }
 
 uint8_t HARadio::rxBuffer(uint8_t *buffer, uint8_t len) {
     uint8_t totalread = 0;
     // Prepare for transmit
     const static prog_uchar prepare[] PROGMEM = {
-        1, 0x36,
 	1, 0x34,	    // SRX
         0,
     };
-
+    const static prog_uchar prepare2[] PROGMEM = {
+	1, 0x36,	    // SIDLE
+        0,
+    };
+    
+    DEBUGREG();
     spiTable(prepare);
-
+    DEBUGREG();
+    
     delay(10); // wait 10 ms, just to be sure.
     
     uint8_t rxbytes = regRead(0xFB);
@@ -183,6 +207,10 @@ uint8_t HARadio::rxBuffer(uint8_t *buffer, uint8_t len) {
     }
     
     delayMicroseconds(5);
+    
+    DEBUGREG();
+    spiTable(prepare2);
+    DEBUGREG();
     
     return totalread;
 }
