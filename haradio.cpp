@@ -8,19 +8,6 @@
 #include <SPI.h>
 #include "haradio.h"
 
-struct packet {
-  uint8_t sync; // do i need this? probably not but it's not a bad idea
-  uint8_t HDB2;
-  uint8_t HDB1;
-  uint32_t target_address;
-  uint32_t source_address;
-  
-  uint8_t *data;
-  uint8_t dlength;
-  uint8_t rlength;  // real length, for protocol
-  // uint32_t pflags // protocol flags?  Do I want this?
-};
-
 int HARadio::setup_packet(struct packet *p) {
   p->sync = 0b01010100; // required sync word
   p->source_address = my_address;
@@ -51,9 +38,16 @@ int HARadio::setup_packet(struct packet *p) {
   return p->rlength;
 }
 
-int HARadio::receive_packet(struct packet *p, uint8_t *buffer) {
+int HARadio::receive_packet(struct packet *p, uint8_t buffer[64+9]) {
   int p_buff = 0;
   uint8_t dab, sab, ndb;
+  
+  uint8_t p_len = rxBuffer(buffer, 64+9);
+  if (p_len < 3) // We didn't get a complete header, ignore it
+    return 0;
+  
+  if (p == NULL) // gave us a bad packet struct
+    return -1;
   
   p->sync = buffer[p_buff++];
   if (buffer[0] != 0b01010100)
@@ -109,6 +103,9 @@ int HARadio::receive_packet(struct packet *p, uint8_t *buffer) {
   }
   
   p_buff += sab;
+  
+  p->data = buffer[p_buff]; // set the pointer to where in that buffer it goes.  no copying!
+  p->dlength = p->rlength;
   
   // no such thing as an invalid source address right now, might have to have them later?
   // At this point we have the entire packet header parsed, we now have a pointer to the data, what do we do now?
@@ -166,7 +163,6 @@ int HARadio::send_packet(struct packet *p) {
 
 HARadio::HARadio() {
 };
-int csn = 10;
 
 void HARadio::spiTable(const prog_uchar *table)
 {
