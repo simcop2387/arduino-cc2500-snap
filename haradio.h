@@ -27,18 +27,19 @@ struct packet {
 class HARadio
 {
 public:
-    HARadio(uint32_t address, int _csn = 10) : my_address( address ), csn ( _csn );
+    HARadio(uint32_t address, int _csn = 10) : my_address( address ), csn ( _csn ) {};
     void reset();
     void txBuffer(const uint8_t *buffer, uint8_t len);
     uint8_t rxBuffer(uint8_t *buffer, uint8_t len);
     
-    int HARadio::setup_packet(struct packet *p);
-    int HARadio::receive_packet(struct packet *p, uint8_t buffer[64+9]);
-    int HARadio::send_packet(struct packet *p);
+    int setup_packet(struct packet *p);
+    int receive_packet(struct packet *p, uint8_t buffer[64+9]);
+    int send_packet(struct packet *p);
 
 private:
 
     uint32_t my_address;
+    int csn;
     
     void spiTable(const prog_uchar *table);
     byte regRead(byte reg);
